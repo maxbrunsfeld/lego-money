@@ -2,39 +2,43 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-const groundHeight = canvas.height / 4;
+
+const groundHeight = canvas.height / 3;
+const groundTop = canvas.height - groundHeight;
+const groundBottom = canvas.height;
+let viewPortX = 0;
 
 const treeImages = [];
 let loadedImages = 0;
 let minifigImage;
 
-const minifigPosition = {
+const minifigState = {
   direction: 'right',
   walking: false,
   x: 100,
-  y: canvas.height - groundHeight
+  y: (groundTop + groundHeight / 2)
 }
 
-const treePositions = [];
+const treeStates = [];
 
 document.addEventListener('keydown', (event) => {
-  minifigPosition.walking = true;
+  minifigState.walking = true;
   switch (event.key) {
     case 'ArrowUp':
     case 'w':
-      minifigPosition.direction = 'up';
+      minifigState.direction = 'up';
       break;
     case 'ArrowDown':
     case 's':
-      minifigPosition.direction = 'down';
+      minifigState.direction = 'down';
       break;
     case 'ArrowLeft':
     case 'a':
-      minifigPosition.direction = 'left';
+      minifigState.direction = 'left';
       break;
     case 'ArrowRight':
     case 'd':
-      minifigPosition.direction = 'right';
+      minifigState.direction = 'right';
       break;
   }
   draw();
@@ -42,7 +46,7 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keyup', (event) => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 's', 'a', 'd'].includes(event.key)) {
-    minifigPosition.walking = false;
+    minifigState.walking = false;
   }
   draw();
 });
@@ -81,7 +85,7 @@ function start() {
     const minTreeY = canvas.height - groundHeight - treeHeight;
     const maxTreeY = canvas.height - treeHeight;
     const y = minTreeY + Math.random() * (maxTreeY - minTreeY);
-    treePositions.push({
+    treeStates.push({
       x,
       y,
       image: treeImg,
@@ -94,10 +98,32 @@ function start() {
 }
 
 function draw() {
+  if (minifigState.walking) {
+    switch (minifigState.direction) {
+      case "left":
+        minifigState.x -= 0.1;
+        break;
+      case "right":
+      minifigState.x += 0.1;
+        break;
+      case "up":
+        minifigState.y -= 0.1;
+        break;
+      case "down":
+        minifigState.y += 0.1;
+        break;
+    }
+
+    if (minifigState.y > groundBottom) {
+      minifigState.y = groundBottom;
+    } else if (minifigState.y < groundTop) {
+      minifigState.y = groundTop;
+    }
+  }
+
   // Set canvas dimensions to window size
   // Clear the canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   drawTrees();
   drawMinifig();
 
@@ -105,39 +131,38 @@ function draw() {
 }
 
 function drawTrees() {
-
   // Draw ground
   ctx.fillStyle = "#8B4513"; // Brown
   ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
 
   // Place trees at random positions
-  for (const tree of treePositions) {
+  for (const tree of treeStates) {
     ctx.drawImage(tree.image, tree.x, tree.y, tree.width, tree.height);
   }
 }
 
 function drawMinifig() {
-  const x = 50;
   // Assuming the sprite sheet has a 3x3 grid of images
   // Extract only the top-left sprite
   const spriteWidth = minifigImage.width / 3;
   const spriteHeight = minifigImage.height / 3;
 
-  const y = minifigPosition.y;
+  const x = minifigState.x;
+  const y = minifigState.y - spriteHeight
 
   console.log(minifigImage, spriteWidth, spriteHeight)
 
   // Determine which row to use based on direction
   let sourceY = 0; // Default: facing left/right (top row)
-  if (minifigPosition.direction === 'down') {
+  if (minifigState.direction === 'down') {
     sourceY = spriteHeight; // Second row
-  } else if (minifigPosition.direction === 'up') {
+  } else if (minifigState.direction === 'up') {
     sourceY = spriteHeight * 2; // Third row
   }
 
   // Determine which column to use based on walking state
   let sourceX = 0; // Default: not walking (first column)
-  if (minifigPosition.walking) {
+  if (minifigState.walking) {
     // If walking, use one of the animation frames (second or third column)
     sourceX = Math.floor(Date.now() / 250) % 2 + 1; // Alternates between columns 1 and 2
     sourceX *= spriteWidth;
@@ -145,7 +170,7 @@ function drawMinifig() {
 
   ctx.save();
 
-  if (minifigPosition.direction === 'right') {
+  if (minifigState.direction === 'right') {
     // Flip horizontally for right-facing direction
     ctx.scale(-1, 1);
     ctx.drawImage(
