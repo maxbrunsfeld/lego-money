@@ -1,3 +1,5 @@
+import level from './level.js';
+
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
@@ -6,11 +8,14 @@ canvas.height = window.innerHeight;
 const groundHeight = canvas.height / 3;
 const groundTop = canvas.height - groundHeight;
 const groundBottom = canvas.height;
+const xSpacing = 100;
 let viewPortX = 0;
 
 const treeImages = [];
 let loadedImages = 0;
 let minifigImage;
+let minifigWidth;
+let minifigHeight;
 
 const minifigState = {
   direction: 'right',
@@ -22,7 +27,6 @@ const minifigState = {
 const treeStates = [];
 
 document.addEventListener('keydown', (event) => {
-  minifigState.walking = true;
   switch (event.key) {
     case 'ArrowUp':
     case 'w':
@@ -40,25 +44,29 @@ document.addEventListener('keydown', (event) => {
     case 'd':
       minifigState.direction = 'right';
       break;
+    default:
+      return;
   }
-  draw();
+
+  minifigState.walking = true;
 });
 
 document.addEventListener('keyup', (event) => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 's', 'a', 'd'].includes(event.key)) {
     minifigState.walking = false;
   }
-  draw();
 });
 
-const treeNames = ["pine-tree.png", "apple-tree.png"];
+const treeNames = {
+  "pine": "images/pine-tree.png",
+  "apple": "images/apple-tree.png"
+};
 function load() {
-  for (let i = 0; i < treeNames.length; i++) {
-    const treeName = treeNames[i];
+  for (const treeKind in treeNames) {
     const img = new Image();
     img.onload = imageLoaded;
-    img.src = `images/${treeName}`; // Assuming tree images are named tree1.png, tree2.png, etc.
-    treeImages.push(img);
+    img.src = treeNames[treeKind]
+    treeImages[treeKind] = img
   }
 
   minifigImage = new Image();
@@ -67,50 +75,32 @@ function load() {
 
   function imageLoaded() {
     loadedImages++;
-    if (loadedImages === treeNames.length + 1) {
+    if (loadedImages === Object.keys(treeNames).length + 1) {
+      minifigWidth = minifigImage.width / 3;
+      minifigHeight = minifigImage.height / 3;
       start();
     }
   }
 }
 
 function start() {
-  for (let i = 0; i < 15; i++) {
-    const treeImg = treeImages[Math.floor(Math.random() * treeImages.length)];
-    const maxTreeHeight = canvas.height * 0.5;
-    const minTreeHeight = canvas.height * 0.1;
-    const treeHeight =
-      minTreeHeight + Math.random() * (maxTreeHeight - minTreeHeight);
-    const treeWidth = (treeImg.width * treeHeight) / treeImg.height;
-    const x = Math.random() * canvas.width;
-    const minTreeY = canvas.height - groundHeight - treeHeight;
-    const maxTreeY = canvas.height - treeHeight;
-    const y = minTreeY + Math.random() * (maxTreeY - minTreeY);
-    treeStates.push({
-      x,
-      y,
-      image: treeImg,
-      height: treeHeight,
-      width: treeWidth,
-    })
-  }
-
   draw();
 }
 
-function draw() {
+function updateState() {
   if (minifigState.walking) {
     switch (minifigState.direction) {
       case "left":
-        minifigState.x -= 0.1;
+        minifigState.x -= 5;
         break;
       case "right":
-      minifigState.x += 0.1;
+      minifigState.x += 5;
         break;
       case "up":
-        minifigState.y -= 0.1;
+        minifigState.y -= 5;
         break;
       case "down":
-        minifigState.y += 0.1;
+        minifigState.y += 5;
         break;
     }
 
@@ -120,6 +110,17 @@ function draw() {
       minifigState.y = groundTop;
     }
   }
+
+  if (minifigState.x - xSpacing < viewPortX) {
+    viewPortX = minifigState.x - xSpacing;
+  }
+  if (minifigState.x + minifigWidth + xSpacing > viewPortX + canvas.width) {
+    viewPortX = minifigState.x + minifigWidth + xSpacing - canvas.width;
+  }
+}
+
+function draw() {
+  updateState();
 
   // Set canvas dimensions to window size
   // Clear the canvas
@@ -136,28 +137,24 @@ function drawTrees() {
   ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
 
   // Place trees at random positions
-  for (const tree of treeStates) {
-    ctx.drawImage(tree.image, tree.x, tree.y, tree.width, tree.height);
+  for (const tree of level.trees) {
+    const treeImg = treeImages[tree.kind];
+    const treeY = groundBottom - tree.height - (tree.y * groundHeight) / 100;
+    const treeWidth = (tree.height * treeImg.width) / treeImg.height;
+    ctx.drawImage(treeImg, tree.x - viewPortX, treeY, treeWidth, tree.height);
   }
 }
 
 function drawMinifig() {
-  // Assuming the sprite sheet has a 3x3 grid of images
-  // Extract only the top-left sprite
-  const spriteWidth = minifigImage.width / 3;
-  const spriteHeight = minifigImage.height / 3;
-
-  const x = minifigState.x;
-  const y = minifigState.y - spriteHeight
-
-  console.log(minifigImage, spriteWidth, spriteHeight)
+  const x = minifigState.x - viewPortX;
+  const y = minifigState.y - minifigHeight
 
   // Determine which row to use based on direction
   let sourceY = 0; // Default: facing left/right (top row)
   if (minifigState.direction === 'down') {
-    sourceY = spriteHeight; // Second row
+    sourceY = minifigHeight; // Second row
   } else if (minifigState.direction === 'up') {
-    sourceY = spriteHeight * 2; // Third row
+    sourceY = minifigHeight * 2; // Third row
   }
 
   // Determine which column to use based on walking state
@@ -165,7 +162,7 @@ function drawMinifig() {
   if (minifigState.walking) {
     // If walking, use one of the animation frames (second or third column)
     sourceX = Math.floor(Date.now() / 250) % 2 + 1; // Alternates between columns 1 and 2
-    sourceX *= spriteWidth;
+    sourceX *= minifigWidth;
   }
 
   ctx.save();
@@ -176,18 +173,18 @@ function drawMinifig() {
     ctx.drawImage(
       minifigImage,
       sourceX, sourceY,                // Source position
-      spriteWidth, spriteHeight,       // Source dimensions
-      -x - spriteWidth, y,             // Adjust x position for flipped context
-      spriteWidth, spriteHeight        // Destination dimensions
+      minifigWidth, minifigHeight,       // Source dimensions
+      -x - minifigWidth, y,             // Adjust x position for flipped context
+      minifigWidth, minifigHeight        // Destination dimensions
     );
   } else {
     // No flipping needed for other directions
     ctx.drawImage(
       minifigImage,
       sourceX, sourceY,           // Source position
-      spriteWidth, spriteHeight,  // Source dimensions
+      minifigWidth, minifigHeight,  // Source dimensions
       x, y,                       // Destination position
-      spriteWidth, spriteHeight   // Destination dimensions
+      minifigWidth, minifigHeight   // Destination dimensions
     );
   }
 
