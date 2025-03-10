@@ -84,5 +84,11 @@ export default {
       "y": 10,
       "height": 150
     },
-  ]
+  ],
+  "shop": {
+    "x": 2500,
+    "y": 50,
+    "width": 200,
+    "height": 200
+  }
 }

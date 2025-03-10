@@ -12,8 +12,8 @@ const xSpacing = 100;
 let viewPortX = 0;
 
 const treeImages = [];
-let loadedImages = 0;
 let minifigImage;
+let shopImage;
 let minifigWidth;
 let minifigHeight;
 
@@ -61,7 +61,10 @@ const treeNames = {
   "pine": "images/pine-tree.png",
   "apple": "images/apple-tree.png"
 };
+
 function load() {
+  let loadedImages = 0;
+
   for (const treeKind in treeNames) {
     const img = new Image();
     img.onload = imageLoaded;
@@ -73,9 +76,13 @@ function load() {
   minifigImage.src = "images/minifig.png";
   minifigImage.onload = imageLoaded;
 
+  shopImage = new Image();
+  shopImage.src = "images/shop.png";
+  shopImage.onload = imageLoaded;
+
   function imageLoaded() {
     loadedImages++;
-    if (loadedImages === Object.keys(treeNames).length + 1) {
+    if (loadedImages === Object.keys(treeNames).length + 1 + 1) {
       minifigWidth = minifigImage.width / 3;
       minifigHeight = minifigImage.height / 3;
       start();
@@ -125,17 +132,28 @@ function draw() {
   // Set canvas dimensions to window size
   // Clear the canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawGround();
   drawTrees();
+  drawShop();
   drawMinifig();
 
   requestAnimationFrame(draw);
 }
 
-function drawTrees() {
-  // Draw ground
-  ctx.fillStyle = "#8B4513"; // Brown
-  ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
+function drawShop() {
+  const shop = level.shop;
+  const shopY = groundBottom - shop.height - (shop.y * groundHeight) / 100;
+  const shopWidth = (shop.height * shopImage.width) / shopImage.height;
+  ctx.drawImage(shopImage, shop.x - viewPortX, shopY, shopWidth, shop.height);
+}
 
+function drawGround() {
+  ctx.fillStyle = "#8B4513";
+  ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
+}
+
+function drawTrees() {
   // Place trees at random positions
   for (const tree of level.trees) {
     const treeImg = treeImages[tree.kind];
