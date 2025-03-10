@@ -21,10 +21,8 @@ const minifigState = {
   direction: 'right',
   walking: false,
   x: 100,
-  y: (groundTop + groundHeight / 2)
+  y: 50
 }
-
-const treeStates = [];
 
 document.addEventListener('keydown', (event) => {
   switch (event.key) {
@@ -104,17 +102,17 @@ function updateState() {
       minifigState.x += 5;
         break;
       case "up":
-        minifigState.y -= 5;
+        minifigState.y += 1;
         break;
       case "down":
-        minifigState.y += 5;
+        minifigState.y -= 1;
         break;
     }
 
-    if (minifigState.y > groundBottom) {
-      minifigState.y = groundBottom;
-    } else if (minifigState.y < groundTop) {
-      minifigState.y = groundTop;
+    if (minifigState.y > 100) {
+      minifigState.y = 100;
+    } else if (minifigState.y < 0) {
+      minifigState.y = 0;
     }
   }
 
@@ -126,7 +124,9 @@ function updateState() {
   }
 }
 
+let frameCount = 0;
 function draw() {
+  frameCount += 1;
   updateState();
 
   // Set canvas dimensions to window size
@@ -134,18 +134,40 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   drawGround();
-  drawTrees();
-  drawShop();
-  drawMinifig();
+
+
+  const sprites = []
+
+  addMinifig(sprites)
+
+  for (const tree of level.trees) {
+    sprites.push({
+      x: tree.x,
+      y: tree.y,
+      width: tree.width,
+      height: tree.height,
+      image: treeImages[tree.kind],
+      sourceX: 0,
+      sourceY: 0,
+    });
+  }
+  sprites.push({
+    x: level.shop.x,
+    y: level.shop.y,
+    width: level.shop.width,
+    height: level.shop.height,
+    sourceX: 0,
+    sourceY: 0,
+    image: shopImage,
+  });
+
+  sprites.sort((a, b) => b.y - a.y);
+
+  for (const sprite of sprites) {
+    drawSprite(sprite)
+  }
 
   requestAnimationFrame(draw);
-}
-
-function drawShop() {
-  const shop = level.shop;
-  const shopY = groundBottom - shop.height - (shop.y * groundHeight) / 100;
-  const shopWidth = (shop.height * shopImage.width) / shopImage.height;
-  ctx.drawImage(shopImage, shop.x - viewPortX, shopY, shopWidth, shop.height);
 }
 
 function drawGround() {
@@ -153,61 +175,70 @@ function drawGround() {
   ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
 }
 
-function drawTrees() {
-  // Place trees at random positions
-  for (const tree of level.trees) {
-    const treeImg = treeImages[tree.kind];
-    const treeY = groundBottom - tree.height - (tree.y * groundHeight) / 100;
-    const treeWidth = (tree.height * treeImg.width) / treeImg.height;
-    ctx.drawImage(treeImg, tree.x - viewPortX, treeY, treeWidth, tree.height);
-  }
-}
-
-function drawMinifig() {
-  const x = minifigState.x - viewPortX;
-  const y = minifigState.y - minifigHeight
-
-  // Determine which row to use based on direction
-  let sourceY = 0; // Default: facing left/right (top row)
+function addMinifig(sprites) {
+  let row = 0;
   if (minifigState.direction === 'down') {
-    sourceY = minifigHeight; // Second row
+    row = 1;
   } else if (minifigState.direction === 'up') {
-    sourceY = minifigHeight * 2; // Third row
+    row = 2;
   }
 
-  // Determine which column to use based on walking state
-  let sourceX = 0; // Default: not walking (first column)
+  let column = 0;
   if (minifigState.walking) {
-    // If walking, use one of the animation frames (second or third column)
-    sourceX = Math.floor(Date.now() / 250) % 2 + 1; // Alternates between columns 1 and 2
-    sourceX *= minifigWidth;
+    column = Math.floor(Date.now() / 250) % 2 + 1; // Alternates between columns 1 and 2
   }
 
-  ctx.save();
+  const flipX = minifigState.direction === 'right';
 
-  if (minifigState.direction === 'right') {
-    // Flip horizontally for right-facing direction
-    ctx.scale(-1, 1);
-    ctx.drawImage(
-      minifigImage,
-      sourceX, sourceY,                // Source position
-      minifigWidth, minifigHeight,       // Source dimensions
-      -x - minifigWidth, y,             // Adjust x position for flipped context
-      minifigWidth, minifigHeight        // Destination dimensions
-    );
-  } else {
-    // No flipping needed for other directions
-    ctx.drawImage(
-      minifigImage,
-      sourceX, sourceY,           // Source position
-      minifigWidth, minifigHeight,  // Source dimensions
-      x, y,                       // Destination position
-      minifigWidth, minifigHeight   // Destination dimensions
-    );
-  }
-
-  ctx.restore();
+  sprites.push({
+    x: minifigState.x,
+    y: minifigState.y,
+    width: minifigWidth,
+    height: minifigHeight,
+    column,
+    row,
+    rowCount: 3,
+    columnCount: 3,
+    flipX,
+    image: minifigImage,
+  });
 }
 
-// Start loading the trees
+function drawSprite(sprite) {
+  const width = (sprite.height * sprite.image.width) / sprite.image.height;
+  let x = sprite.x - viewPortX;
+  const y = groundBottom - sprite.height - ((sprite.y * groundHeight) / 100);
+
+  if (sprite.flipX) {
+    ctx.save();
+    ctx.scale(-1, 1);
+    x = -1 * x - width;
+  }
+
+  let srcX = 0;
+  let srcY = 0;
+  let srcWidth = sprite.image.width;
+  let srcHeight = sprite.image.height;
+  if (sprite.rowCount) {
+    srcHeight = sprite.image.height / sprite.rowCount;
+    srcY = sprite.row * srcHeight;
+  }
+  if (sprite.columnCount) {
+    srcWidth = sprite.image.width / sprite.columnCount;
+    srcX = sprite.column * srcWidth;
+  }
+
+  ctx.drawImage(
+    sprite.image,
+    srcX, srcY,
+    srcWidth, srcHeight,
+    x, y,
+    width, sprite.height
+  );
+
+  if (sprite.flipX) {
+    ctx.restore();
+  }
+}
+
 load();

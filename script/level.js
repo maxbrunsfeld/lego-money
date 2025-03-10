@@ -86,7 +86,7 @@ export default {
     },
   ],
   "shop": {
-    "x": 2500,
+    "x": 250,
     "y": 50,
     "width": 200,
     "height": 200
